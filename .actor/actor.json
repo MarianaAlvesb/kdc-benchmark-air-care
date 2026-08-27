@@ -4,9 +4,6 @@
     "title": "Air Care Benchmark & Taxonomist Processor",
     "description": "Cleans raw marketplace datasets, filters out refills/consumables, and normalizes items against the Air Care Taxonomy.",
     "version": "0.0.1",
-    "meta": {
-        "templateId": "python-crawlee-bs4"
-    },
     "input": "./input_schema.json",
     "dockerfile": "../Dockerfile"
 }
