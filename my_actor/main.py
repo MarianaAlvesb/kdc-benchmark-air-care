@@ -139,3 +139,7 @@ async def main() -> None:
         # FASE 5: Guardar el resultado final limpio en la plataforma de Apify
         await Actor.push_data(master_records)
         Actor.log.info(f"Procesamiento finalizado. Dispositivos únicos guardados: {len(master_records)}")
+
+if __name__ == '__main__':
+    import asyncio
+    asyncio.run(main())
