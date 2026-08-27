@@ -31,7 +31,7 @@ def create_canonical_key(brand_code: str, title: str) -> str:
 def extract_brand_from_title(title: str) -> str:
     """Extrae la marca del título del producto."""
     # Buscar marcas conocidas al inicio del título
-    known_brands = ['air wick', 'febreze', 'glade', 'mrs. meyer']
+    known_brands = ["Air Wick", "Febreze", "Glade", "Shark", "Dreo", "Winix", "Levoit", "Airfire", "GermGuardian", "Bcooss", "Noahstrong", "Mainstays", "Fimilo", "Better Homes & Gardens", "Great Value", "Yankee Candle"]
     title_lower = title.lower()
     for brand in known_brands:
         if title_lower.startswith(brand):
