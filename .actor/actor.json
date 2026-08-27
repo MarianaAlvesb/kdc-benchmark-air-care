@@ -5,5 +5,4 @@
     "version": "1.0.0",
     "input": "./input_schema.json",
     "dockerfile": "../Dockerfile",
-    "dockerRunCommand": "python -m my_actor"
 }
