@@ -11,5 +11,5 @@
             "editor": "json"
         }
     },
-    "required": ["raw_dataset"]
+    "required": []
 }
