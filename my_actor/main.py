@@ -3,18 +3,20 @@ from apify import Actor
 
 # Palabras clave para la Fase 2: Filtros de exclusión e inclusión
 REFILL_KEYWORDS = ['refill', 'refills', 'cartridge', 'oil bottle', 'canister', 'replacement']
-DEVICE_KEYWORDS = ['warmer', 'device', 'unit', 'starter kit', 'diffuser', 'dispenser', 'plug-in unit']
+DEVICE_KEYWORDS = ['warmer', 'device', 'unit', 'starter kit', 'diffuser', 'dispenser', 'plug-in unit', 'purifier', 'humidifier']
 
 def is_hardware_device(title: str, description: str) -> bool:
     """Fase 2: Filtra consumibles y exige términos de hardware."""
     text = f"{title} {description}".lower()
     
-    # Regla 2.1: Excluir recambios y consumibles
-    if any(kw in text for kw in REFILL_KEYWORDS):
+    # Exigir términos obligatorios de dispositivo/hardware primero
+    has_device_kw = any(kw in text for kw in DEVICE_KEYWORDS)
+    if not has_device_kw:
         return False
-        
-    # Exigir términos obligatorios de dispositivo
-    if not any(kw in text for kw in DEVICE_KEYWORDS):
+
+    # Excluir solo si son recambios sueltos (si tiene término de hardware explícito como warmer o starter kit, se conserva)
+    has_refill_kw = any(kw in text for kw in REFILL_KEYWORDS)
+    if has_refill_kw and not any(k in text for k in ['starter kit', 'warmer', 'device', 'unit', 'diffuser']):
         return False
         
     return True
@@ -23,18 +25,30 @@ def create_canonical_key(brand_code: str, title: str) -> str:
     """Fase 4: Limpia el título (elimina fragancias/formatos) y genera el device_id."""
     clean_title = title.lower()
     # Eliminación de fragancias y formatos de paquete comunes
-    clean_title = re.sub(r'(lavender|vanilla|linen|amber|citrus|pack of \d+|\d+ count|\d+ pk|white sage|mahogany|cinnamon|apples|juniper|teak|pumpkin|spice|ocean|gain|downy|april fresh|fresh linen|chamomile|rain water)', '', clean_title)
+    clean_title = re.sub(
+        r'(lavender|vanilla|linen|amber|citrus|pack of \d+|\d+ count|\d+ pk|white sage|mahogany|cinnamon|apples|juniper|teak|pumpkin|spice|ocean|gain|downy|april fresh|fresh linen|chamomile|rain water)',
+        '',
+        clean_title
+    )
     # Generar slug limpio
     model_slug = re.sub(r'[^a-z0-9]+', '_', clean_title).strip('_')
+    
+    # Fallback si el slug quedó vacío tras la limpieza
+    if not model_slug:
+        model_slug = "device"
+        
     return f"{brand_code.lower()}_{model_slug}"
 
 def extract_brand_from_title(title: str) -> str:
     """Extrae la marca del título del producto."""
-    # Buscar marcas conocidas al inicio del título
-    known_brands = ["Air Wick", "Febreze", "Glade", "Shark", "Dreo", "Winix", "Levoit", "Airfire", "GermGuardian", "Bcooss", "Noahstrong", "Mainstays", "Fimilo", "Better Homes & Gardens", "Great Value", "Yankee Candle"]
+    known_brands = [
+        "Air Wick", "Febreze", "Glade", "Shark", "Dreo", "Winix", 
+        "Levoit", "Airfire", "GermGuardian", "Bcooss", "Noahstrong", 
+        "Mainstays", "Fimilo", "Better Homes & Gardens", "Great Value", "Yankee Candle"
+    ]
     title_lower = title.lower()
     for brand in known_brands:
-        if title_lower.startswith(brand):
+        if title_lower.startswith(brand.lower()):
             return brand.replace('. ', '_').replace(' ', '_')
     return "unknown_brand"
 
@@ -55,7 +69,6 @@ async def main() -> None:
 
         # FASE 2: Pre-filtrado (Noise Removal)
         for item in raw_dataset:
-            # Mapear campos del JSON: productTitle, description
             title = item.get("productTitle") or item.get("title", "")
             description = item.get("description", "")
             
