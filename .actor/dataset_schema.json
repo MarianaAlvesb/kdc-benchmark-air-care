@@ -4,32 +4,43 @@
     "fields": {},
     "views": {
         "overview": {
-            "title": "Overview",
+            "title": "Air Care Taxonomy Output",
             "transformation": {
-                "fields": ["title", "url", "h1s", "h2s", "h3s"]
+                "fields": [
+                    "device_id",
+                    "brand_code",
+                    "title",
+                    "pack_format_code",
+                    "reviews_count",
+                    "classification_status"
+                ]
             },
             "display": {
                 "component": "table",
                 "properties": {
-                    "title": {
-                        "label": "Title",
+                    "device_id": {
+                        "label": "Device ID",
                         "format": "text"
                     },
-                    "url": {
-                        "label": "URL",
-                        "format": "link"
+                    "brand_code": {
+                        "label": "Brand Code",
+                        "format": "text"
                     },
-                    "h1s": {
-                        "label": "H1s",
-                        "format": "array"
+                    "title": {
+                        "label": "Product Title",
+                        "format": "text"
                     },
-                    "h2s": {
-                        "label": "H2s",
-                        "format": "array"
+                    "pack_format_code": {
+                        "label": "Format",
+                        "format": "text"
                     },
-                    "h3s": {
-                        "label": "H3s",
-                        "format": "array"
+                    "reviews_count": {
+                        "label": "Reviews",
+                        "format": "number"
+                    },
+                    "classification_status": {
+                        "label": "Status",
+                        "format": "text"
                     }
                 }
             }
