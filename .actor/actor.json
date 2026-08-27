@@ -1,7 +1,7 @@
 {
     "actorSpecification": 1,
     "name": "kdc-benchmark-air-care",
-    "title": "Air Care Benchmark & Taxonomist Processor",
+    "title": "Air Care Benchmark Processor",
     "description": "Cleans raw marketplace datasets, filters out refills/consumables, and normalizes items against the Air Care Taxonomy.",
     "version": "1.0.0",
     "input": "./input_schema.json",
