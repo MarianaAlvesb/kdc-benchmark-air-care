@@ -10,4 +10,4 @@ COPY . ./
 
 # 4. Define el comando de inicio para ejecutar tu script
 # (Ajusta 'src/main.py' por la ruta exacta a tu archivo principal)
-CMD ["python", "-m", "src.main"]
+CMD ["python", "my_actor/main.py"]
