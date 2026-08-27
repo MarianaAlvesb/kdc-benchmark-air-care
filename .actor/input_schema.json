@@ -7,8 +7,9 @@
         "raw_dataset": {
             "title": "Raw Scraped Dataset",
             "type": "array",
-            "description": "List of raw products scraped from Amazon or Walmart",
+            "description": "List of raw products scraped from Walmart with fields: productId, productTitle, productUrl, reviewCount, rating, seller, image",
             "editor": "json"
         }
-    }
+    },
+    "required": ["raw_dataset"]
 }
