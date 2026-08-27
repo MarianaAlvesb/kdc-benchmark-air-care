@@ -1,19 +1,14 @@
 {
     "$schema": "https://apify.com/schemas/v1/input.ide.json",
-    "title": "Python Crawlee BeautifulSoup Scraper",
+    "title": "Air Care Benchmark Processor",
     "type": "object",
     "schemaVersion": 1,
     "properties": {
-        "start_urls": {
-            "title": "Start URLs",
+        "raw_dataset": {
+            "title": "Raw Scraped Dataset",
             "type": "array",
-            "description": "URLs to start with",
-            "prefill": [
-                {
-                    "url": "https://apify.com"
-                }
-            ],
-            "editor": "requestListSources"
+            "description": "List of raw products scraped from Amazon or Walmart",
+            "editor": "json"
         }
-    },
+    }
 }
