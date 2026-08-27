@@ -1,5 +1,7 @@
 import re
+import asyncio
 from apify import Actor
+from apify_client import ApifyClient
 
 # Palabras clave para la Fase 2: Filtros de exclusión e inclusión
 REFILL_KEYWORDS = ['refill', 'refills', 'cartridge', 'oil bottle', 'canister', 'replacement']
@@ -54,14 +56,37 @@ def extract_brand_from_title(title: str) -> str:
 
 async def main() -> None:
     async with Actor:
-        # Recuperar la entrada proporcionada al Actor
+        # Recuperar la entrada proporcionada por la Skill de Claude (o la interfaz)
         actor_input = await Actor.get_input() or {}
         
-        # Leer el raw_dataset del input
-        raw_dataset = actor_input.get("raw_dataset", [])
+        # 1. Parámetros de búsqueda dinámicos
+        search_term = actor_input.get("search_term", "air freshener")
+        max_items = actor_input.get("max_items", 50)
         
+        # Opcional: Si por alguna razón se envía raw_dataset directo, usarlo como fallback
+        raw_dataset = actor_input.get("raw_dataset")
+
         if not raw_dataset:
-            Actor.log.warning("No raw_dataset found in input")
+            Actor.log.info(f"Iniciando scraping automático en Walmart para la búsqueda: '{search_term}' (máx: {max_items} productos)...")
+            
+            # Inicializar cliente de Apify con el token del entorno
+            client = ApifyClient(token=Actor.config.token)
+            
+            # 2. Ejecutar el Actor de Walmart (Ajusta 'apify/walmart-scraper' si usas otro ID específico)
+            run = client.actor("apify/walmart-scraper").call(
+                run_input={
+                    "search": search_term,
+                    "maxItems": max_items
+                }
+            )
+            
+            # 3. Obtener los productos sin procesar descargados por el scraper
+            dataset_id = run.get("defaultDatasetId")
+            raw_dataset = client.dataset(dataset_id).list_items().items
+            Actor.log.info(f"Scraping completado. {len(raw_dataset)} productos brutos obtenidos de Walmart.")
+
+        if not raw_dataset:
+            Actor.log.warning("No se obtuvieron resultados de Walmart para procesar.")
             await Actor.push_data([])
             return
         
@@ -97,8 +122,9 @@ async def main() -> None:
                 "device_id": device_id,
                 "brand_code": brand_code,
                 "title": raw_title,
-                "url": item.get("productUrl", ""),
+                "url": item.get("productUrl") or item.get("url", ""),
                 "product_id": item.get("productId", ""),
+                "price": item.get("price") or item.get("salePrice", 0),
                 "asin_sku": item.get("productId", ""),
                 "reviews_count": item.get("reviewCount", 0),
                 "rating": item.get("rating", 0),
@@ -141,5 +167,4 @@ async def main() -> None:
         Actor.log.info(f"Procesamiento finalizado. Dispositivos únicos guardados: {len(master_records)}")
 
 if __name__ == '__main__':
-    import asyncio
     asyncio.run(main())
