@@ -1,4 +1,4 @@
-# Air Care Benchmark & Taxonomist Processor
+# Air Care Benchmark Processor
 
 Este Actor de Apify actúa como un procesador y taxonomizador de datos para la categoría **Air Care**. Toma datasets sin procesar (*raw datasets*) procedentes de scraping (ej. Walmart, Amazon) y aplica reglas de negocio para filtrar recambios, estandarizar marcas y crear registros únicos de dispositivos.
 
