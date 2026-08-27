@@ -23,22 +23,40 @@ def create_canonical_key(brand_code: str, title: str) -> str:
     """Fase 4: Limpia el título (elimina fragancias/formatos) y genera el device_id."""
     clean_title = title.lower()
     # Eliminación de fragancias y formatos de paquete comunes
-    clean_title = re.sub(r'(lavender|vanilla|linen|amber|citrus|pack of \d+|\d+ count|\d+ pk)', '', clean_title)
+    clean_title = re.sub(r'(lavender|vanilla|linen|amber|citrus|pack of \d+|\d+ count|\d+ pk|white sage|mahogany|cinnamon|apples|juniper|teak|pumpkin|spice|ocean|gain|downy|april fresh|fresh linen|chamomile|rain water)', '', clean_title)
     # Generar slug limpio
     model_slug = re.sub(r'[^a-z0-9]+', '_', clean_title).strip('_')
     return f"{brand_code.lower()}_{model_slug}"
+
+def extract_brand_from_title(title: str) -> str:
+    """Extrae la marca del título del producto."""
+    # Buscar marcas conocidas al inicio del título
+    known_brands = ['air wick', 'febreze', 'glade', 'mrs. meyer']
+    title_lower = title.lower()
+    for brand in known_brands:
+        if title_lower.startswith(brand):
+            return brand.replace('. ', '_').replace(' ', '_')
+    return "unknown_brand"
 
 async def main() -> None:
     async with Actor:
         # Recuperar la entrada proporcionada al Actor
         actor_input = await Actor.get_input() or {}
+        
+        # Leer el raw_dataset del input
         raw_dataset = actor_input.get("raw_dataset", [])
+        
+        if not raw_dataset:
+            Actor.log.warning("No raw_dataset found in input")
+            await Actor.push_data([])
+            return
         
         candidates = []
 
         # FASE 2: Pre-filtrado (Noise Removal)
         for item in raw_dataset:
-            title = item.get("title", "")
+            # Mapear campos del JSON: productTitle, description
+            title = item.get("productTitle") or item.get("title", "")
             description = item.get("description", "")
             
             if is_hardware_device(title, description):
@@ -46,12 +64,16 @@ async def main() -> None:
             else:
                 Actor.log.info(f"Omitido (Fase 2 - Consumible/Sin hardware): {title}")
 
+        Actor.log.info(f"Fase 2 completada: {len(candidates)} candidatos seleccionados de {len(raw_dataset)} productos")
+
         # FASES 3 Y 4: Taxonomía y Deduplicación
         grouped_devices = {}
 
         for item in candidates:
-            raw_title = item.get("title", "")
-            raw_brand = item.get("brand", "unknown_brand")
+            raw_title = item.get("productTitle") or item.get("title", "")
+            
+            # Extraer marca del título del producto
+            raw_brand = extract_brand_from_title(raw_title)
             brand_code = re.sub(r'[^a-z0-9]', '_', raw_brand.lower())
             
             # Generar la clave única de dispositivo (Fase 4.1)
@@ -62,10 +84,14 @@ async def main() -> None:
                 "device_id": device_id,
                 "brand_code": brand_code,
                 "title": raw_title,
-                "url": item.get("url", ""),
-                "asin_sku": item.get("asin") or item.get("sku"),
-                "reviews_count": item.get("reviewsCount", 0),
+                "url": item.get("productUrl", ""),
+                "product_id": item.get("productId", ""),
+                "asin_sku": item.get("productId", ""),
+                "reviews_count": item.get("reviewCount", 0),
+                "rating": item.get("rating", 0),
                 "pack_format_code": "starter_kit" if "starter kit" in raw_title.lower() else "device_only",
+                "seller": item.get("seller", ""),
+                "image_url": item.get("image", ""),
                 "raw_claims": item.get("claims", []),
                 "classification_status": "mapped" if brand_code != "unknown_brand" else "review_required"
             }
@@ -73,6 +99,8 @@ async def main() -> None:
             if device_id not in grouped_devices:
                 grouped_devices[device_id] = []
             grouped_devices[device_id].append(processed_record)
+
+        Actor.log.info(f"Fase 3-4 completada: {len(grouped_devices)} dispositivos únicos identificados")
 
         # FASE 4.2: Selección del Master Record (Deduplicación)
         master_records = []
@@ -91,6 +119,7 @@ async def main() -> None:
             master = records[0]
             # Guardar SKUs secundarios asociados
             master["associated_variant_skus"] = [r["asin_sku"] for r in records[1:] if r.get("asin_sku")]
+            master["variant_count"] = len(records)
             
             master_records.append(master)
 
