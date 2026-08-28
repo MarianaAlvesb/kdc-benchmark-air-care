@@ -64,29 +64,21 @@ async def main() -> None:
         
         client = Actor.new_client()
         
-        # ✅ Await obligatorio al llamar al scraper
-        run = await client.actor("apify/walmart-scraper").call(
+        # Llamar al Actor de Walmart válido
+        run = await client.actor("triggre/walmart-scraper").call(
             run_input={
-                "search": search_term,
+                "startUrls": [
+                    {
+                        "url": f"https://www.walmart.com/search?q={search_term.replace(' ', '+')}"
+                    }
+                ],
                 "maxItems": max_items
             }
         )
         
-        # ✅ Await obligatorio al listar items del dataset
         dataset_id = run.get("defaultDatasetId")
         dataset_page = await client.dataset(dataset_id).list_items()
-        
-        if hasattr(dataset_page, 'items'):
-            raw_dataset = list(dataset_page.items)
-        elif isinstance(dataset_page, dict) and 'items' in dataset_page:
-            raw_dataset = dataset_page['items']
-        elif isinstance(dataset_page, list):
-            raw_dataset = dataset_page
-        else:
-            raw_dataset = []
-            
-        Actor.log.info(f"Scraping completado. {len(raw_dataset)} productos brutos obtenidos de Walmart.")
-        
+
         
         # FASE 2: Pre-filtrado (Noise Removal)
         candidates = []
