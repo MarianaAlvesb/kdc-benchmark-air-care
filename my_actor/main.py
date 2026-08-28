@@ -56,29 +56,35 @@ async def main() -> None:
     async with Actor:
         actor_input = await Actor.get_input() or {}
         
-# FASE 1: Ingesta de Parámetros y Scraping en Walmart
+        # FASE 1: Ingesta de Parámetros y Scraping en Walmart
         search_term = actor_input.get("search_term", "air freshener")
         max_items = actor_input.get("max_items", 50)
         
-        Actor.log.info(f"Iniciando ejecución para search_term='{search_term}' (máx: {max_items} productos)...")
+        Actor.log.info(f"Iniciando ejecucion para search_term='{search_term}' (máx: {max_items} productos)...")
         
         client = Actor.new_client()
         
-        # Usamos el nombre canónico oficial de la Apify Store
-        run = await client.actor("apify/walmart-items-scraper").call(
+        # ✅ Nombre del actor corregido y estructura de input adecuada
+        run = await client.actor("sian.agency/walmart-data-scraper").call(
             run_input={
-                "search": search_term,
-                "maxItems": max_items,
-                "startUrls": [
-                    {
-                        "url": f"https://www.walmart.com/search?q={search_term.replace(' ', '+')}"
-                    }
-                ]
+                "searchKey": search_term,
+                "limit": max_items
             }
         )
         
         dataset_id = run.get("defaultDatasetId")
         dataset_page = await client.dataset(dataset_id).list_items()
+        
+        if hasattr(dataset_page, 'items'):
+            raw_dataset = list(dataset_page.items)
+        elif isinstance(dataset_page, dict) and 'items' in dataset_page:
+            raw_dataset = dataset_page['items']
+        elif isinstance(dataset_page, list):
+            raw_dataset = dataset_page
+        else:
+            raw_dataset = []
+            
+        Actor.log.info(f"Scraping completado. {len(raw_dataset)} productos brutos obtenidos de Walmart.")
         
         
         # FASE 2: Pre-filtrado (Noise Removal)
