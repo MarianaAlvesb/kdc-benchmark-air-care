@@ -56,7 +56,7 @@ async def main() -> None:
     async with Actor:
         actor_input = await Actor.get_input() or {}
         
-        # FASE 1: Ingesta de Parámetros y Scraping en Walmart
+       # FASE 1: Ingesta de Parámetros y Scraping en Walmart
         search_term = actor_input.get("search_term", "air freshener")
         max_items = actor_input.get("max_items", 50)
         
@@ -64,7 +64,6 @@ async def main() -> None:
         
         client = Actor.new_client()
         
-        # ✅ Nombre del actor corregido y estructura de input adecuada
         run = await client.actor("sian.agency/walmart-data-scraper").call(
             run_input={
                 "searchKey": search_term,
@@ -72,7 +71,8 @@ async def main() -> None:
             }
         )
         
-        dataset_id = run.get("defaultDatasetId")
+        # Acceso correcto a la propiedad del objeto Run
+        dataset_id = run.default_dataset_id
         dataset_page = await client.dataset(dataset_id).list_items()
         
         if hasattr(dataset_page, 'items'):
