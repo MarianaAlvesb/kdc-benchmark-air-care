@@ -56,29 +56,30 @@ async def main() -> None:
     async with Actor:
         actor_input = await Actor.get_input() or {}
         
-        # FASE 1: Ingesta de Parámetros y Scraping en Walmart
+# FASE 1: Ingesta de Parámetros y Scraping en Walmart
         search_term = actor_input.get("search_term", "air freshener")
         max_items = actor_input.get("max_items", 50)
         
-        Actor.log.info(f"Iniciando ejecucion para search_term='{search_term}' (máx: {max_items} productos)...")
+        Actor.log.info(f"Iniciando ejecución para search_term='{search_term}' (máx: {max_items} productos)...")
         
         client = Actor.new_client()
         
-        # Llamar al Actor de Walmart válido
-        run = await client.actor("triggre/walmart-scraper").call(
+        # Usamos el nombre canónico oficial de la Apify Store
+        run = await client.actor("apify/walmart-items-scraper").call(
             run_input={
+                "search": search_term,
+                "maxItems": max_items,
                 "startUrls": [
                     {
                         "url": f"https://www.walmart.com/search?q={search_term.replace(' ', '+')}"
                     }
-                ],
-                "maxItems": max_items
+                ]
             }
         )
         
         dataset_id = run.get("defaultDatasetId")
         dataset_page = await client.dataset(dataset_id).list_items()
-
+        
         
         # FASE 2: Pre-filtrado (Noise Removal)
         candidates = []
