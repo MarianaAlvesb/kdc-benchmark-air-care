@@ -62,18 +62,19 @@ async def main() -> None:
         
         Actor.log.info(f"Iniciando ejecucion para search_term='{search_term}' (máx: {max_items} productos)...")
         
-        # Uso del nuevo cliente nativo del SDK 4.x
         client = Actor.new_client()
         
-        run = client.actor("apify/walmart-scraper").call(
+        # ✅ Await obligatorio al llamar al scraper
+        run = await client.actor("apify/walmart-scraper").call(
             run_input={
                 "search": search_term,
                 "maxItems": max_items
             }
         )
         
+        # ✅ Await obligatorio al listar items del dataset
         dataset_id = run.get("defaultDatasetId")
-        dataset_page = client.dataset(dataset_id).list_items()
+        dataset_page = await client.dataset(dataset_id).list_items()
         
         if hasattr(dataset_page, 'items'):
             raw_dataset = list(dataset_page.items)
@@ -85,11 +86,7 @@ async def main() -> None:
             raw_dataset = []
             
         Actor.log.info(f"Scraping completado. {len(raw_dataset)} productos brutos obtenidos de Walmart.")
-
-        if not raw_dataset:
-            Actor.log.warning("No se obtuvieron resultados de Walmart para procesar.")
-            await Actor.push_data([])
-            return
+        
         
         # FASE 2: Pre-filtrado (Noise Removal)
         candidates = []
