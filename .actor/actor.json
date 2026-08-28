@@ -4,5 +4,5 @@
     "title": "Air Care Benchmark Processor",
     "version": "1.0.0",
     "input": "./input_schema.json",
-    "dockerfile": "../Dockerfile",
+    "dockerfile": "../Dockerfile"
 }
