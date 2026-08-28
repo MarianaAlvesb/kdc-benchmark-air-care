@@ -1,7 +1,6 @@
 import re
 import asyncio
 from apify import Actor
-from apify_client import ApifyClient
 
 # Palabras clave para la Fase 2: Filtros de exclusión e inclusión
 REFILL_KEYWORDS = ['refill', 'refills', 'cartridge', 'oil bottle', 'canister', 'replacement']
@@ -9,14 +8,16 @@ DEVICE_KEYWORDS = ['warmer', 'device', 'unit', 'starter kit', 'diffuser', 'dispe
 
 def is_hardware_device(title: str, description: str) -> bool:
     """Fase 2: Filtra consumibles y exige términos de hardware."""
-    text = f"{title} {description}".lower()
+    title_clean = str(title or "").lower()
+    desc_clean = str(description or "").lower()
+    text = f"{title_clean} {desc_clean}"
     
     # Exigir términos obligatorios de dispositivo/hardware primero
     has_device_kw = any(kw in text for kw in DEVICE_KEYWORDS)
     if not has_device_kw:
         return False
 
-    # Excluir solo si son recambios sueltos (si tiene término de hardware explícito como warmer o starter kit, se conserva)
+    # Excluir solo si son recambios sueltos sin hardware explicito
     has_refill_kw = any(kw in text for kw in REFILL_KEYWORDS)
     if has_refill_kw and not any(k in text for k in ['starter kit', 'warmer', 'device', 'unit', 'diffuser']):
         return False
@@ -24,18 +25,15 @@ def is_hardware_device(title: str, description: str) -> bool:
     return True
 
 def create_canonical_key(brand_code: str, title: str) -> str:
-    """Fase 4: Limpia el título (elimina fragancias/formatos) y genera el device_id."""
+    """Fase 4.1: Limpia el título (elimina fragancias/formatos) y genera el device_id."""
     clean_title = title.lower()
-    # Eliminación de fragancias y formatos de paquete comunes
     clean_title = re.sub(
         r'(lavender|vanilla|linen|amber|citrus|pack of \d+|\d+ count|\d+ pk|white sage|mahogany|cinnamon|apples|juniper|teak|pumpkin|spice|ocean|gain|downy|april fresh|fresh linen|chamomile|rain water)',
         '',
         clean_title
     )
-    # Generar slug limpio
     model_slug = re.sub(r'[^a-z0-9]+', '_', clean_title).strip('_')
     
-    # Fallback si el slug quedó vacío tras la limpieza
     if not model_slug:
         model_slug = "device"
         
@@ -56,19 +54,17 @@ def extract_brand_from_title(title: str) -> str:
 
 async def main() -> None:
     async with Actor:
-        # Recuperar la entrada proporcionada por Claude o por la consola de Apify
         actor_input = await Actor.get_input() or {}
         
-        # 1. Extraer los parámetros de búsqueda del Input
+        # FASE 1: Ingesta de Parámetros y Scraping en Walmart
         search_term = actor_input.get("search_term", "air freshener")
         max_items = actor_input.get("max_items", 50)
         
         Actor.log.info(f"Iniciando ejecucion para search_term='{search_term}' (máx: {max_items} productos)...")
         
-        # 2. Inicializar cliente de Apify con el token del entorno
-        client = ApifyClient(token=Actor.config.token)
+        # Uso del nuevo cliente nativo del SDK 4.x
+        client = Actor.new_client()
         
-        # 3. Ejecutar el Actor de Walmart de forma transparente
         run = client.actor("apify/walmart-scraper").call(
             run_input={
                 "search": search_term,
@@ -76,11 +72,9 @@ async def main() -> None:
             }
         )
         
-        # 4. Obtener los productos de forma segura y convertirlos a lista (array) de Python
         dataset_id = run.get("defaultDatasetId")
         dataset_page = client.dataset(dataset_id).list_items()
         
-        # Conversión garantizada a lista pura (Array)
         if hasattr(dataset_page, 'items'):
             raw_dataset = list(dataset_page.items)
         elif isinstance(dataset_page, dict) and 'items' in dataset_page:
@@ -97,9 +91,8 @@ async def main() -> None:
             await Actor.push_data([])
             return
         
-        candidates = []
-
         # FASE 2: Pre-filtrado (Noise Removal)
+        candidates = []
         for item in raw_dataset:
             title = item.get("productTitle") or item.get("title", "")
             description = item.get("description", "")
@@ -111,20 +104,16 @@ async def main() -> None:
 
         Actor.log.info(f"Fase 2 completada: {len(candidates)} candidatos seleccionados de {len(raw_dataset)} productos")
 
-        # FASES 3 Y 4: Taxonomía y Deduplicación
+        # FASES 3 Y 4.1: Mapeo de Taxonomía y Agrupación Canónica
         grouped_devices = {}
-
         for item in candidates:
             raw_title = item.get("productTitle") or item.get("title", "")
             
-            # Extraer marca del título del producto
             raw_brand = extract_brand_from_title(raw_title)
             brand_code = re.sub(r'[^a-z0-9]', '_', raw_brand.lower())
             
-            # Generar la clave única de dispositivo (Fase 4.1)
             device_id = create_canonical_key(brand_code, raw_title)
             
-            # Mapeo de taxonomía básico (Fase 3)
             processed_record = {
                 "device_id": device_id,
                 "brand_code": brand_code,
@@ -146,13 +135,11 @@ async def main() -> None:
                 grouped_devices[device_id] = []
             grouped_devices[device_id].append(processed_record)
 
-        Actor.log.info(f"Fase 3-4 completada: {len(grouped_devices)} dispositivos únicos identificados")
+        Actor.log.info(f"Fases 3-4.1 completadas: {len(grouped_devices)} dispositivos únicos agrupados")
 
         # FASE 4.2: Selección del Master Record (Deduplicación)
         master_records = []
-        
         for device_id, records in grouped_devices.items():
-            # Ordenar por prioridad: 1. Starter Kit / Device Only | 2. Mayor número de reviews
             records.sort(
                 key=lambda x: (
                     1 if x["pack_format_code"] in ["starter_kit", "device_only"] else 0,
@@ -161,15 +148,13 @@ async def main() -> None:
                 reverse=True
             )
             
-            # Seleccionar el primer registro como Master Record
             master = records[0]
-            # Guardar SKUs secundarios asociados
             master["associated_variant_skus"] = [r["asin_sku"] for r in records[1:] if r.get("asin_sku")]
             master["variant_count"] = len(records)
             
             master_records.append(master)
 
-        # FASE 5: Guardar el resultado final limpio en la plataforma de Apify
+        # FASE 5: Exportación de Resultados
         await Actor.push_data(master_records)
         Actor.log.info(f"Procesamiento finalizado. Dispositivos únicos guardados: {len(master_records)}")
 
