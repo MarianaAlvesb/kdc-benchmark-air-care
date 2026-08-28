@@ -56,34 +56,41 @@ def extract_brand_from_title(title: str) -> str:
 
 async def main() -> None:
     async with Actor:
-        # Recuperar la entrada proporcionada por la Skill de Claude (o la interfaz)
+        # Recuperar la entrada proporcionada por Claude o por la consola de Apify
         actor_input = await Actor.get_input() or {}
         
-        # 1. Parámetros de búsqueda dinámicos
+        # 1. Extraer los parámetros de búsqueda del Input
         search_term = actor_input.get("search_term", "air freshener")
         max_items = actor_input.get("max_items", 50)
         
-        # Opcional: Si por alguna razón se envía raw_dataset directo, usarlo como fallback
-        raw_dataset = actor_input.get("raw_dataset")
-
-        if not raw_dataset:
-            Actor.log.info(f"Iniciando scraping automático en Walmart para la búsqueda: '{search_term}' (máx: {max_items} productos)...")
+        Actor.log.info(f"Iniciando ejecucion para search_term='{search_term}' (máx: {max_items} productos)...")
+        
+        # 2. Inicializar cliente de Apify con el token del entorno
+        client = ApifyClient(token=Actor.config.token)
+        
+        # 3. Ejecutar el Actor de Walmart de forma transparente
+        run = client.actor("apify/walmart-scraper").call(
+            run_input={
+                "search": search_term,
+                "maxItems": max_items
+            }
+        )
+        
+        # 4. Obtener los productos de forma segura y convertirlos a lista (array) de Python
+        dataset_id = run.get("defaultDatasetId")
+        dataset_page = client.dataset(dataset_id).list_items()
+        
+        # Conversión garantizada a lista pura (Array)
+        if hasattr(dataset_page, 'items'):
+            raw_dataset = list(dataset_page.items)
+        elif isinstance(dataset_page, dict) and 'items' in dataset_page:
+            raw_dataset = dataset_page['items']
+        elif isinstance(dataset_page, list):
+            raw_dataset = dataset_page
+        else:
+            raw_dataset = []
             
-            # Inicializar cliente de Apify con el token del entorno
-            client = ApifyClient(token=Actor.config.token)
-            
-            # 2. Ejecutar el Actor de Walmart (Ajusta 'apify/walmart-scraper' si usas otro ID específico)
-            run = client.actor("apify/walmart-scraper").call(
-                run_input={
-                    "search": search_term,
-                    "maxItems": max_items
-                }
-            )
-            
-            # 3. Obtener los productos sin procesar descargados por el scraper
-            dataset_id = run.get("defaultDatasetId")
-            raw_dataset = client.dataset(dataset_id).list_items().items
-            Actor.log.info(f"Scraping completado. {len(raw_dataset)} productos brutos obtenidos de Walmart.")
+        Actor.log.info(f"Scraping completado. {len(raw_dataset)} productos brutos obtenidos de Walmart.")
 
         if not raw_dataset:
             Actor.log.warning("No se obtuvieron resultados de Walmart para procesar.")
