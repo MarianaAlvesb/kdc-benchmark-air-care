@@ -11,6 +11,12 @@
             "editor": "textfield",
             "default": "plug in diffuser starter kit"
         },
+        "max_pages": {
+            "title": "Máximo de Páginas",
+            "type": "integer",
+            "description": "Número de páginas de resultados que revisará el scraper de Walmart",
+            "default": 3
+        },
         "max_items": {
             "title": "Max Items",
             "type": "integer",
