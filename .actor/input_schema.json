@@ -16,7 +16,7 @@
             "type": "integer",
             "description": "Número máximo de productos brutos a extraer de Walmart",
             "editor": "number",
-            "default": 30
+            "default": 100
         }
     },
     "required": ["search_term"]
