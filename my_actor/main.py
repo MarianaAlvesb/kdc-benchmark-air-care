@@ -69,7 +69,7 @@ async def main() -> None:
             run_input={
                 "query": search_term,
                 "type": "search",
-                "maxPages": 1
+                "maxPages": max_pages
             }
         )
         
